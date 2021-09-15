@@ -12,48 +12,49 @@ public class Lexer implements IPLPLexer
 
     public Lexer(String code)
     {
-        //String[] strings = code.split("[ \n\r\t]+");
-        //this.code = new ArrayList<>(Arrays.asList(strings));
         ArrayList<String> lines = new ArrayList<>(Arrays.asList(code.split("\n")));
         for (String line : lines)
         {
-            String tokenString = "";
-            int tokenIndex = -1;
+            StringBuilder token = new StringBuilder();
+            IntHolder tokenIndex = new IntHolder(-1);
 
             for (int i = 0; i < line.length(); i++)
             {
                 char c = line.charAt(i);
                 if (c != ' ' && c != '\n' && c != '\r' && c != '\t')
                 {
-                    if (tokenString.length() > 0 && Character.isDigit(tokenString.charAt(0)) && Character.isLetter(c))
+                    if (token.length() > 0 && Character.isDigit(token.charAt(0)) && Character.isLetter(c))
                     {
-                        if (tokenString.length() > 0)
-                        {
-                            tokenStrings.add(tokenString);
-                            lineIndices.add(lines.indexOf(line));
-                            charIndices.add(tokenIndex);
-                        }
-                        tokenString = "";
-                        tokenIndex = -1;
+                        delimit(token, lines.indexOf(line), tokenIndex);
                     }
 
-                    if (tokenIndex == -1)
-                        tokenIndex = i;
-                    tokenString += line.charAt(i);
+                    if (token.toString().equals("=="))
+                    {
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                    }
+
+                    if (tokenIndex.value == -1)
+                        tokenIndex.value = i;
+                    token.append(line.charAt(i));
                 }
                 if (i == line.length() - 1 || c == ' ' || c == '\n' || c == '\r' || c == '\t')
                 {
-                    if (tokenString.length() > 0)
-                    {
-                        tokenStrings.add(tokenString);
-                        lineIndices.add(lines.indexOf(line));
-                        charIndices.add(tokenIndex);
-                    }
-                    tokenString = "";
-                    tokenIndex = -1;
+                    delimit(token, lines.indexOf(line), tokenIndex);
                 }
             }
         }
+    }
+
+    private void delimit(StringBuilder token, int lineIndex, IntHolder tokenIndex)
+    {
+        if (token.length() > 0)
+        {
+            tokenStrings.add(token.toString());
+            lineIndices.add(lineIndex);
+            charIndices.add(tokenIndex.value);
+        }
+        token.setLength(0);
+        tokenIndex.value = -1;
     }
 
     @Override
@@ -91,24 +92,22 @@ public class Lexer implements IPLPLexer
                     case "LIST" -> token = new Token(PLPTokenKinds.Kind.KW_LIST, string, lineIndex, charIndex);
                     default -> token = new Token(PLPTokenKinds.Kind.IDENTIFIER, string, lineIndex, charIndex);
                 }
-            }
-            else if (Character.isDigit(string.charAt(0)))
+            } else if (Character.isDigit(string.charAt(0)))
             {
-                try {
+                try
+                {
                     int test = Integer.parseInt(string);
                     token = new Token(PLPTokenKinds.Kind.INT_LITERAL, string, lineIndex, charIndex);
                 } catch (NumberFormatException e)
                 {
                     throw new LexicalException("Integer cannot be parsed", lineIndex, charIndex);
                 }
-            }
-            else if (string.charAt(0) == '"' || string.charAt(0) == 39)
+            } else if (string.charAt(0) == '"' || string.charAt(0) == 39)
             {
-                
-            }
-            else
+                token = new Token(PLPTokenKinds.Kind.STRING_LITERAL, string, lineIndex, charIndex);
+            } else
             {
-                switch(string)
+                switch (string)
                 {
                     case "=" -> token = new Token(PLPTokenKinds.Kind.ASSIGN, string, lineIndex, charIndex);
                     case "," -> token = new Token(PLPTokenKinds.Kind.COMMA, string, lineIndex, charIndex);
@@ -135,11 +134,20 @@ public class Lexer implements IPLPLexer
                 }
             }
             index++;
-        }
-        else
+        } else
         {
             token = new Token(PLPTokenKinds.Kind.EOF, "\n", 0, 0);
         }
         return token;
+    }
+
+    private class IntHolder
+    {
+        public int value;
+
+        public IntHolder(int value)
+        {
+            this.value = value;
+        }
     }
 }

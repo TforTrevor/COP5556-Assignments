@@ -42,7 +42,7 @@ public class Token implements IPLPToken
     @Override
     public String getStringValue()
     {
-        return text;
+        return text.substring(1, text.length() - 1);
     }
 
     @Override

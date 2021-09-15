@@ -28,11 +28,6 @@ public class Lexer implements IPLPLexer
                         delimit(token, lines.indexOf(line), tokenIndex);
                     }
 
-                    if (token.toString().equals("=="))
-                    {
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                    }
-
                     if (tokenIndex.value == -1)
                         tokenIndex.value = i;
                     token.append(line.charAt(i));
@@ -40,6 +35,12 @@ public class Lexer implements IPLPLexer
                 if (i == line.length() - 1 || c == ' ' || c == '\n' || c == '\r' || c == '\t')
                 {
                     delimit(token, lines.indexOf(line), tokenIndex);
+                }
+
+                switch (token.toString())
+                {
+                    case ",", ";", ":", "(", ")", "[", "]", "&&", "||", "<", ">", "==", "!=", "+", "-", "*" ->
+                            delimit(token, lines.indexOf(line), tokenIndex);
                 }
             }
         }

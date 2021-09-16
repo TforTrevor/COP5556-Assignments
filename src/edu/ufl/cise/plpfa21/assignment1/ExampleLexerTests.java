@@ -310,4 +310,62 @@ class ExampleLexerTests implements PLPTokenKinds {
 			assertEquals(token.getText(), ")");
 		}
 	}
+
+	@Test
+	public void test8() throws LexicalException
+	{
+		String input = """
+    !=&&||
+				""";
+		IPLPLexer lexer = getLexer(input);
+		{
+			IPLPToken token = lexer.nextToken();
+			Kind kind = token.getKind();
+			assertEquals(kind, Kind.NOT_EQUALS);
+			assertEquals(token.getLine(), 1);
+			assertEquals(token.getCharPositionInLine(), 0);
+			assertEquals(token.getText(), "!=");
+		}
+		{
+			IPLPToken token = lexer.nextToken();
+			Kind kind = token.getKind();
+			assertEquals(kind, Kind.AND);
+			assertEquals(token.getLine(), 1);
+			assertEquals(token.getCharPositionInLine(), 2);
+			assertEquals(token.getText(), "&&");
+		}
+		{
+			IPLPToken token = lexer.nextToken();
+			Kind kind = token.getKind();
+			assertEquals(kind, Kind.OR);
+			assertEquals(token.getLine(), 1);
+			assertEquals(token.getCharPositionInLine(), 4);
+			assertEquals(token.getText(), "||");
+		}
+	}
+
+	@Test
+	public void test9() throws LexicalException
+	{
+		String input = """
+    First/* Comment */Last
+				""";
+		IPLPLexer lexer = getLexer(input);
+		{
+			IPLPToken token = lexer.nextToken();
+			Kind kind = token.getKind();
+			assertEquals(kind, Kind.IDENTIFIER);
+			assertEquals(token.getLine(), 1);
+			assertEquals(token.getCharPositionInLine(), 0);
+			assertEquals(token.getText(), "First");
+		}
+		{
+			IPLPToken token = lexer.nextToken();
+			Kind kind = token.getKind();
+			assertEquals(kind, Kind.IDENTIFIER);
+			assertEquals(token.getLine(), 1);
+			assertEquals(token.getCharPositionInLine(), 18);
+			assertEquals(token.getText(), "Last");
+		}
+	}
 }

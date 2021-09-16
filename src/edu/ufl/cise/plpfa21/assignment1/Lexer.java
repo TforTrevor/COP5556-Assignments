@@ -17,40 +17,69 @@ public class Lexer implements IPLPLexer
         {
             StringBuilder token = new StringBuilder();
             IntHolder tokenIndex = new IntHolder(-1);
+            boolean comment = false;
 
             for (int i = 0; i < line.length(); i++)
             {
                 char c = line.charAt(i);
 
-                switch (c)
+                if (comment)
                 {
-                    case ' ', '\n', '\r', '\t' -> delimit(token, lines.indexOf(line), tokenIndex);
-                    case ',', ';', ':', '(', ')', '[', ']', '<', '>', '+', '-' -> {
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                        if (tokenIndex.value == -1)
-                            tokenIndex.value = i;
+                    if (c == '*')
+                    {
                         token.append(c);
-                        delimit(token, lines.indexOf(line), tokenIndex);
                     }
-                    default -> {
-                        if (token.length() > 0 && Character.isDigit(token.charAt(0)) && !Character.isDigit(c))
-                        {
-                            delimit(token, lines.indexOf(line), tokenIndex);
-                        }
-
-                        if (token.toString().equals("=="))
-                        {
-                            delimit(token, lines.indexOf(line), tokenIndex);
-                        }
-
-                        if (tokenIndex.value == -1)
-                            tokenIndex.value = i;
-                        token.append(c);
+                    else if (c == '/' && token.charAt(token.length() - 1) == '*')
+                    {
+                        token.setLength(0);
+                        comment = false;
                     }
                 }
-                if (i == line.length() - 1)
+                else
                 {
-                    delimit(token, lines.indexOf(line), tokenIndex);
+                    switch (c)
+                    {
+                        case ' ', '\n', '\r', '\t' -> delimit(token, lines.indexOf(line), tokenIndex);
+                        case ',', ';', ':', '(', ')', '[', ']', '<', '>', '+', '-' -> {
+                            delimit(token, lines.indexOf(line), tokenIndex);
+                            if (tokenIndex.value == -1)
+                                tokenIndex.value = i;
+                            token.append(c);
+                            delimit(token, lines.indexOf(line), tokenIndex);
+                        }
+                        case '*' -> {
+                            if (token.charAt(token.length() - 1) == '/')
+                            {
+                                comment = true;
+                                token.deleteCharAt(token.length() - 1);
+                                delimit(token, lines.indexOf(line), tokenIndex);
+                            }
+                        }
+                        default -> {
+                            if (token.length() > 0 && Character.isDigit(token.charAt(0)) && !Character.isDigit(c))
+                            {
+                                delimit(token, lines.indexOf(line), tokenIndex);
+                            }
+
+                            if (tokenIndex.value == -1)
+                                tokenIndex.value = i;
+                            token.append(c);
+                        }
+                    }
+
+                    if (token.toString().equals("=="))
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                    if (token.toString().equals("!="))
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                    if (token.toString().equals("!="))
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                    if (token.toString().equals("&&"))
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                    if (token.toString().equals("||"))
+                        delimit(token, lines.indexOf(line), tokenIndex);
+
+                    if (i == line.length() - 1)
+                        delimit(token, lines.indexOf(line), tokenIndex);
                 }
             }
         }

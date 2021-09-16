@@ -21,26 +21,36 @@ public class Lexer implements IPLPLexer
             for (int i = 0; i < line.length(); i++)
             {
                 char c = line.charAt(i);
-                if (c != ' ' && c != '\n' && c != '\r' && c != '\t')
+
+                switch (c)
                 {
-                    if (token.length() > 0 && Character.isDigit(token.charAt(0)) && Character.isLetter(c))
-                    {
+                    case ' ', '\n', '\r', '\t' -> delimit(token, lines.indexOf(line), tokenIndex);
+                    case ',', ';', ':', '(', ')', '[', ']', '<', '>', '+', '-' -> {
+                        delimit(token, lines.indexOf(line), tokenIndex);
+                        if (tokenIndex.value == -1)
+                            tokenIndex.value = i;
+                        token.append(c);
                         delimit(token, lines.indexOf(line), tokenIndex);
                     }
+                    default -> {
+                        if (token.length() > 0 && Character.isDigit(token.charAt(0)) && !Character.isDigit(c))
+                        {
+                            delimit(token, lines.indexOf(line), tokenIndex);
+                        }
 
-                    if (tokenIndex.value == -1)
-                        tokenIndex.value = i;
-                    token.append(line.charAt(i));
+                        if (token.toString().equals("=="))
+                        {
+                            delimit(token, lines.indexOf(line), tokenIndex);
+                        }
+
+                        if (tokenIndex.value == -1)
+                            tokenIndex.value = i;
+                        token.append(c);
+                    }
                 }
-                if (i == line.length() - 1 || c == ' ' || c == '\n' || c == '\r' || c == '\t')
+                if (i == line.length() - 1)
                 {
                     delimit(token, lines.indexOf(line), tokenIndex);
-                }
-
-                switch (token.toString())
-                {
-                    case ",", ";", ":", "(", ")", "[", "]", "&&", "||", "<", ">", "==", "!=", "+", "-", "*" ->
-                            delimit(token, lines.indexOf(line), tokenIndex);
                 }
             }
         }

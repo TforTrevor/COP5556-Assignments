@@ -260,19 +260,6 @@ public class Parser implements IPLPParser
         }
     }
 
-    private int hexToDecimal(String hex)
-    {
-        String digits = "0123456789ABCDEF";
-        hex = hex.toUpperCase();
-        int value = 0;
-        for (char c : hex.toCharArray())
-        {
-            int d = digits.indexOf(c);
-            value = 16 * value + d;
-        }
-        return value;
-    }
-
     private void multiplicativeExpression() throws SyntaxException
     {
         unaryExpression();

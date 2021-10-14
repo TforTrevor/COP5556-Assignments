@@ -4,6 +4,7 @@ import edu.ufl.cise.plpfa21.assignment1.IPLPLexer;
 import edu.ufl.cise.plpfa21.assignment1.IPLPToken;
 import edu.ufl.cise.plpfa21.assignment1.LexicalException;
 import edu.ufl.cise.plpfa21.assignment1.PLPTokenKinds;
+import edu.ufl.cise.plpfa21.assignment3.ast.IASTNode;
 
 public class Parser implements IPLPParser
 {
@@ -17,7 +18,7 @@ public class Parser implements IPLPParser
     }
 
     @Override
-    public void parse() throws Exception
+    public IASTNode parse() throws Exception
     {
         program();
     }

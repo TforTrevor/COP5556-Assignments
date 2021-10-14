@@ -1,10 +1,11 @@
 package edu.ufl.cise.plpfa21.assignment2;
 
-import edu.ufl.cise.plpfa21.assignment1.IPLPLexer;
-import edu.ufl.cise.plpfa21.assignment1.IPLPToken;
-import edu.ufl.cise.plpfa21.assignment1.LexicalException;
-import edu.ufl.cise.plpfa21.assignment1.PLPTokenKinds;
-import edu.ufl.cise.plpfa21.assignment3.ast.IASTNode;
+import edu.ufl.cise.plpfa21.assignment1.*;
+import edu.ufl.cise.plpfa21.assignment3.ast.*;
+import edu.ufl.cise.plpfa21.assignment3.astimpl.*;
+
+import java.lang.reflect.Array;
+import java.util.ArrayList;
 
 public class Parser implements IPLPParser
 {
@@ -20,25 +21,28 @@ public class Parser implements IPLPParser
     @Override
     public IASTNode parse() throws Exception
     {
-        program();
+        return program();
     }
 
-    private void consume()
+    private IPLPToken consume()
     {
         try
         {
+            IPLPToken returnToken = token;
             token = lexer.nextToken();
+            return returnToken;
         } catch (LexicalException e)
         {
             e.printStackTrace();
         }
+        return null;
     }
 
-    private void match(PLPTokenKinds.Kind kind) throws SyntaxException
+    private IPLPToken match(PLPTokenKinds.Kind kind) throws SyntaxException
     {
         if (token.getKind() == kind)
         {
-            consume();
+            return consume();
         }
         else
         {
@@ -46,331 +50,422 @@ public class Parser implements IPLPParser
         }
     }
 
-    private void program() throws SyntaxException
+    private IProgram program() throws SyntaxException
     {
-        boolean next = true;
-        while (next)
+        ArrayList<IDeclaration> declarations = new ArrayList<>();
+
+        IDeclaration next = null;
+        do
         {
             next = declaration();
-        }
+            if (next != null)
+            {
+                declarations.add(next);
+            }
+        } while (next != null);
+
+        return new Program__(token.getLine(), token.getCharPositionInLine(), token.getText(), declarations);
     }
 
-    private boolean declaration() throws SyntaxException
+    private IDeclaration declaration() throws SyntaxException
     {
         switch (token.getKind())
         {
             case KW_FUN -> {
-                function();
-                return true;
+                return function();
             }
             case KW_VAR -> {
-                match(PLPTokenKinds.Kind.KW_VAR);
-                nameDef();
+                IPLPToken varToken = match(PLPTokenKinds.Kind.KW_VAR);
+                INameDef varDef = nameDef();
+                IExpression expression = null;
                 if (token.getKind() == PLPTokenKinds.Kind.ASSIGN)
                 {
                     match(PLPTokenKinds.Kind.ASSIGN);
-                    expression();
+                    expression = expression();
                 }
                 match(PLPTokenKinds.Kind.SEMI);
-                return true;
+
+                return new MutableGlobal__(varToken.getLine(), varToken.getCharPositionInLine(), varToken.getText(), varDef, expression);
             }
             case KW_VAL -> {
-                match(PLPTokenKinds.Kind.KW_VAL);
-                nameDef();
+                IPLPToken valToken = match(PLPTokenKinds.Kind.KW_VAL);
+                INameDef nameDef = nameDef();
                 match(PLPTokenKinds.Kind.ASSIGN);
-                expression();
+                IExpression expression = expression();
                 match(PLPTokenKinds.Kind.SEMI);
-                return true;
-            }
-            default -> {
-                return false;
+                return new ImmutableGlobal__(valToken.getLine(), valToken.getCharPositionInLine(), valToken.getText(), nameDef, expression);
             }
         }
+        return null;
     }
 
-    private void function() throws SyntaxException
+    private IFunctionDeclaration function() throws SyntaxException
     {
-        match(PLPTokenKinds.Kind.KW_FUN);
-        match(PLPTokenKinds.Kind.IDENTIFIER);
+        IPLPToken functionToken = match(PLPTokenKinds.Kind.KW_FUN);
+        IPLPToken identifierToken = match(PLPTokenKinds.Kind.IDENTIFIER);
+        IIdentifier identifier = new Identifier__(identifierToken.getLine(), identifierToken.getCharPositionInLine(), identifierToken.getText(), identifierToken.getText());
         match(PLPTokenKinds.Kind.LPAREN);
 
+        ArrayList<INameDef> arguments = new ArrayList<>();
         if (token.getKind() == PLPTokenKinds.Kind.IDENTIFIER)
         {
-            nameDef();
+            arguments.add(nameDef());
             while (token.getKind() == PLPTokenKinds.Kind.COMMA)
             {
                 match(PLPTokenKinds.Kind.COMMA);
-                nameDef();
+                arguments.add(nameDef());
             }
         }
 
         match(PLPTokenKinds.Kind.RPAREN);
 
+        IType resultType = null;
         if (token.getKind() == PLPTokenKinds.Kind.COLON)
         {
             match(PLPTokenKinds.Kind.COLON);
-            type();
+            resultType = type();
         }
 
         match(PLPTokenKinds.Kind.KW_DO);
-        block();
+        IBlock block = block();
         match(PLPTokenKinds.Kind.KW_END);
+
+        return new FunctionDeclaration___(functionToken.getLine(), functionToken.getCharPositionInLine(), functionToken.getText(), identifier, arguments, resultType, block);
     }
 
-    private void nameDef() throws SyntaxException
+    private INameDef nameDef() throws SyntaxException
     {
-        match(PLPTokenKinds.Kind.IDENTIFIER);
+        IPLPToken identifierToken = match(PLPTokenKinds.Kind.IDENTIFIER);
+        IIdentifier identifier = new Identifier__(identifierToken.getLine(), identifierToken.getCharPositionInLine(), identifierToken.getText(), identifierToken.getText());
+
+        IType type = null;
         if (token.getKind() == PLPTokenKinds.Kind.COLON)
         {
             match(PLPTokenKinds.Kind.COLON);
-            type();
+            type = type();
         }
+
+        return new NameDef__(identifierToken.getLine(), identifierToken.getCharPositionInLine(), identifierToken.getText(), identifier, type);
     }
 
-    private void type() throws SyntaxException
+    private IType type() throws SyntaxException
     {
         switch (token.getKind())
         {
-            case KW_INT -> match(PLPTokenKinds.Kind.KW_INT);
-            case KW_STRING -> match(PLPTokenKinds.Kind.KW_STRING);
-            case KW_BOOLEAN -> match(PLPTokenKinds.Kind.KW_BOOLEAN);
+            case KW_INT -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_INT);
+                return new PrimitiveType__(token.getLine(), token.getCharPositionInLine(), token.getText(), IType.TypeKind.INT);
+            }
+            case KW_STRING -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_STRING);
+                return new PrimitiveType__(token.getLine(), token.getCharPositionInLine(), token.getText(), IType.TypeKind.STRING);
+            }
+            case KW_BOOLEAN -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_BOOLEAN);
+                return new PrimitiveType__(token.getLine(), token.getCharPositionInLine(), token.getText(), IType.TypeKind.BOOLEAN);
+            }
             case KW_LIST -> {
-                match(PLPTokenKinds.Kind.KW_LIST);
+                IPLPToken listToken = match(PLPTokenKinds.Kind.KW_LIST);
                 match(PLPTokenKinds.Kind.LSQUARE);
+                IType type = null;
                 if (token.getKind() != PLPTokenKinds.Kind.RSQUARE)
                 {
-                    type();
+                    type = type();
                 }
                 match(PLPTokenKinds.Kind.RSQUARE);
+                return new ListType__(listToken.getLine(), listToken.getCharPositionInLine(), listToken.getText(), type);
             }
         }
+        return null;
     }
 
-    private void block() throws SyntaxException
+    private IBlock block() throws SyntaxException
     {
-        while (true)
+        IPLPToken blockToken = this.token;
+        ArrayList<IStatement> statements = new ArrayList<>();
+        while (token.getKind() != PLPTokenKinds.Kind.KW_END && token.getKind() != PLPTokenKinds.Kind.KW_DEFAULT)
         {
-            statement();
+            statements.add(statement());
         }
+        return new Block__(blockToken.getLine(), blockToken.getCharPositionInLine(), blockToken.getText(), statements);
     }
 
-    private void statement() throws SyntaxException
+    private IStatement statement() throws SyntaxException
     {
         switch (token.getKind())
         {
             case KW_LET -> {
-                match(PLPTokenKinds.Kind.KW_LET);
-                nameDef();
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_LET);
+                INameDef localDef = nameDef();
+                IExpression expression = null;
                 if (token.getKind() == PLPTokenKinds.Kind.ASSIGN)
                 {
-                    expression();
+                    expression = expression();
                 }
                 match(PLPTokenKinds.Kind.SEMI);
+
+                return new LetStatement__(token.getLine(), token.getCharPositionInLine(), token.getText(), null, expression, localDef);
             }
             case KW_SWITCH -> {
-                match(PLPTokenKinds.Kind.KW_SWITCH);
-                expression();
+                IPLPToken switchToken = match(PLPTokenKinds.Kind.KW_SWITCH);
+                IExpression switchExpression = expression();
+
+                ArrayList<IExpression> branchExpressions = new ArrayList<>();
+                ArrayList<IBlock> blocks = new ArrayList<>();
                 while (token.getKind() == PLPTokenKinds.Kind.KW_CASE)
                 {
                     match(PLPTokenKinds.Kind.KW_CASE);
-                    expression();
+                    branchExpressions.add(expression());
                     match(PLPTokenKinds.Kind.SEMI);
-                    block();
+                    blocks.add(block());
                 }
                 match(PLPTokenKinds.Kind.KW_DEFAULT);
-                block();
+                IBlock defaultBlock = block();
                 match(PLPTokenKinds.Kind.KW_END);
+
+                return new SwitchStatement__(switchToken.getLine(), switchToken.getCharPositionInLine(), switchToken.getText(),
+                        switchExpression, branchExpressions, blocks, defaultBlock);
             }
             case KW_IF -> {
-                match(PLPTokenKinds.Kind.KW_IF);
-                expression();
+                IPLPToken ifToken = match(PLPTokenKinds.Kind.KW_IF);
+                IExpression guardExpression = expression();
                 match(PLPTokenKinds.Kind.KW_DO);
-                block();
+                IBlock ifBlock = block();
                 match(PLPTokenKinds.Kind.KW_END);
+
+                return new IfStatement__(ifToken.getLine(), ifToken.getCharPositionInLine(), ifToken.getText(), guardExpression, ifBlock);
             }
             case KW_WHILE -> {
-                match(PLPTokenKinds.Kind.KW_WHILE);
-                expression();
+                IPLPToken whileToken = match(PLPTokenKinds.Kind.KW_WHILE);
+                IExpression guardExpression = expression();
                 match(PLPTokenKinds.Kind.KW_DO);
-                block();
+                IBlock block = block();
                 match(PLPTokenKinds.Kind.KW_END);
+
+                return new WhileStatement__(whileToken.getLine(), whileToken.getCharPositionInLine(), whileToken.getText(), guardExpression, block);
             }
             case KW_RETURN -> {
-                match(PLPTokenKinds.Kind.KW_RETURN);
-                expression();
+                IPLPToken returnToken = match(PLPTokenKinds.Kind.KW_RETURN);
+                IExpression returnExpression = expression();
                 match(PLPTokenKinds.Kind.SEMI);
+
+                return new ReturnStatement__(returnToken.getLine(), returnToken.getCharPositionInLine(), returnToken.getText(), returnExpression);
             }
             default -> {
-                expression();
+                IPLPToken token = this.token;
+                IExpression left = expression();
+                IExpression right = null;
                 if (token.getKind() == PLPTokenKinds.Kind.ASSIGN)
                 {
-                    expression();
+                    right = expression();
                 }
                 match(PLPTokenKinds.Kind.SEMI);
+                return new AssignmentStatement__(token.getLine(), token.getCharPositionInLine(), token.getText(), left, right);
             }
         }
     }
 
-    private void expression() throws SyntaxException
+    private IExpression expression() throws SyntaxException
     {
-        logicalExpression();
+        return logicalExpression();
     }
 
-    private void logicalExpression() throws SyntaxException
+    private IExpression logicalExpression() throws SyntaxException
     {
-        comparisonExpression();
+        IExpression left;
+        IExpression right;
+        left = comparisonExpression();
         while (token.getKind() == PLPTokenKinds.Kind.AND || token.getKind() == PLPTokenKinds.Kind.OR)
         {
+            IPLPToken token = this.token;
+            PLPTokenKinds.Kind kind = null;
             switch (token.getKind())
             {
-                case AND -> match(PLPTokenKinds.Kind.AND);
-                case OR -> match(PLPTokenKinds.Kind.OR);
+                case AND -> {
+                    match(PLPTokenKinds.Kind.AND);
+                    kind = PLPTokenKinds.Kind.AND;
+                }
+                case OR -> {
+                    match(PLPTokenKinds.Kind.OR);
+                    kind = PLPTokenKinds.Kind.OR;
+                }
             }
-            comparisonExpression();
+            right = comparisonExpression();
+            left = new BinaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), left, right, kind);
         }
+        return left;
     }
 
-    private void comparisonExpression() throws SyntaxException
+    private IExpression comparisonExpression() throws SyntaxException
     {
-        additiveExpression();
+        IExpression left;
+        IExpression right;
+        left = additiveExpression();
         while (token.getKind() == PLPTokenKinds.Kind.LT || token.getKind() == PLPTokenKinds.Kind.GT ||
                 token.getKind() == PLPTokenKinds.Kind.EQUALS || token.getKind() == PLPTokenKinds.Kind.NOT_EQUALS)
         {
+            IPLPToken token = this.token;
+            PLPTokenKinds.Kind kind = null;
             switch (token.getKind())
             {
-                case LT -> match(PLPTokenKinds.Kind.LT);
-                case GT -> match(PLPTokenKinds.Kind.GT);
-                case EQUALS -> match(PLPTokenKinds.Kind.EQUALS);
-                case NOT_EQUALS -> match(PLPTokenKinds.Kind.NOT_EQUALS);
+                case LT -> {
+                    match(PLPTokenKinds.Kind.LT);
+                    kind = PLPTokenKinds.Kind.LT;
+                }
+                case GT -> {
+                    match(PLPTokenKinds.Kind.GT);
+                    kind = PLPTokenKinds.Kind.GT;
+                }
+                case EQUALS -> {
+                    match(PLPTokenKinds.Kind.EQUALS);
+                    kind = PLPTokenKinds.Kind.EQUALS;
+                }
+                case NOT_EQUALS -> {
+                    match(PLPTokenKinds.Kind.NOT_EQUALS);
+                    kind = PLPTokenKinds.Kind.NOT_EQUALS;
+                }
             }
-            additiveExpression();
+            right = additiveExpression();
+            left = new BinaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), left, right, kind);
         }
+        return left;
     }
 
-    private void additiveExpression() throws SyntaxException
+    private IExpression additiveExpression() throws SyntaxException
     {
-        multiplicativeExpression();
+        IExpression left;
+        IExpression right;
+        left = multiplicativeExpression();
         while (token.getKind() == PLPTokenKinds.Kind.PLUS || token.getKind() == PLPTokenKinds.Kind.MINUS)
         {
+            IPLPToken token = this.token;
+            PLPTokenKinds.Kind kind = null;
             switch (token.getKind())
             {
-                case PLUS -> match(PLPTokenKinds.Kind.PLUS);
-                case MINUS -> match(PLPTokenKinds.Kind.MINUS);
+                case PLUS -> {
+                    match(PLPTokenKinds.Kind.PLUS);
+                    kind = PLPTokenKinds.Kind.PLUS;
+                }
+                case MINUS -> {
+                    match(PLPTokenKinds.Kind.MINUS);
+                    kind = PLPTokenKinds.Kind.MINUS;
+                }
             }
-            multiplicativeExpression();
+            right = multiplicativeExpression();
+            left = new BinaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), left, right, kind);
         }
+        return left;
     }
 
-    private void multiplicativeExpression() throws SyntaxException
+    private IExpression multiplicativeExpression() throws SyntaxException
     {
-        unaryExpression();
+        IExpression left;
+        IExpression right;
+        left = unaryExpression();
         while (token.getKind() == PLPTokenKinds.Kind.TIMES || token.getKind() == PLPTokenKinds.Kind.DIV)
         {
+            IPLPToken token = this.token;
+            PLPTokenKinds.Kind kind = null;
             switch (token.getKind())
             {
-                case TIMES -> match(PLPTokenKinds.Kind.TIMES);
-                case DIV -> match(PLPTokenKinds.Kind.DIV);
+                case TIMES -> {
+                    match(PLPTokenKinds.Kind.TIMES);
+                    kind = PLPTokenKinds.Kind.TIMES;
+                }
+                case DIV -> {
+                    match(PLPTokenKinds.Kind.DIV);
+                    kind = PLPTokenKinds.Kind.DIV;
+                }
             }
-            unaryExpression();
+            right = unaryExpression();
+            left = new BinaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), left, right, kind);
         }
+        return left;
     }
 
-    private void unaryExpression() throws SyntaxException
+    private IExpression unaryExpression() throws SyntaxException
     {
         if (token.getKind() == PLPTokenKinds.Kind.BANG || token.getKind() == PLPTokenKinds.Kind.MINUS)
         {
             switch (token.getKind())
             {
-                case BANG -> match(PLPTokenKinds.Kind.BANG);
-                case MINUS -> match(PLPTokenKinds.Kind.MINUS);
+                case BANG -> {
+                    IPLPToken token = match(PLPTokenKinds.Kind.BANG);
+                    return new UnaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), primaryExpression(), PLPTokenKinds.Kind.BANG);
+                }
+                case MINUS -> {
+                    IPLPToken token = match(PLPTokenKinds.Kind.MINUS);
+                    return new UnaryExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), primaryExpression(), PLPTokenKinds.Kind.MINUS);
+                }
             }
         }
-        primaryExpression();
+        return primaryExpression();
     }
 
-    private void primaryExpression() throws SyntaxException
+    private IExpression primaryExpression() throws SyntaxException
     {
         switch (token.getKind())
         {
-            case KW_NIL -> match(PLPTokenKinds.Kind.KW_NIL);
-            case KW_TRUE -> match(PLPTokenKinds.Kind.KW_TRUE);
-            case KW_FALSE -> match(PLPTokenKinds.Kind.KW_FALSE);
-            case INT_LITERAL -> match(PLPTokenKinds.Kind.INT_LITERAL);
-            case STRING_LITERAL -> match(PLPTokenKinds.Kind.STRING_LITERAL);
+            case KW_NIL -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_NIL);
+                return new NilConstantExpression__(token.getLine(), token.getCharPositionInLine(), token.getText());
+            }
+            case KW_TRUE -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_TRUE);
+                return new BooleanLiteralExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), true);
+            }
+            case KW_FALSE -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.KW_FALSE);
+                return new BooleanLiteralExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), false);
+            }
+            case INT_LITERAL -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.INT_LITERAL);
+                return new IntLiteralExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), Integer.parseInt(token.getText()));
+            }
+            case STRING_LITERAL -> {
+                IPLPToken token = match(PLPTokenKinds.Kind.STRING_LITERAL);
+                return new StringLiteralExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), token.getStringValue());
+            }
             case LPAREN -> {
                 match(PLPTokenKinds.Kind.LPAREN);
-                expression();
+                IExpression expression = expression();
                 match(PLPTokenKinds.Kind.RPAREN);
+                return expression;
             }
             case IDENTIFIER -> {
-                match(PLPTokenKinds.Kind.IDENTIFIER);
+                IPLPToken identifierToken = match(PLPTokenKinds.Kind.IDENTIFIER);
+                IIdentifier identifier = new Identifier__(identifierToken.getLine(), identifierToken.getCharPositionInLine(), identifierToken.getText(), identifierToken.getText());
 
                 if (token.getKind() == PLPTokenKinds.Kind.LPAREN)
                 {
                     match(PLPTokenKinds.Kind.LPAREN);
+                    ArrayList<IExpression> arguments = new ArrayList<>();
                     try
                     {
-                        expression();
+                        arguments.add(expression());
                         while (token.getKind() == PLPTokenKinds.Kind.COMMA)
                         {
                             match(PLPTokenKinds.Kind.COMMA);
-                            expression();
+                            arguments.add(expression());
                         }
                     } catch (SyntaxException e)
                     {
                         e.printStackTrace();
                     }
                     match(PLPTokenKinds.Kind.RPAREN);
+                    return new FunctionCallExpression__(token.getLine(), token.getCharPositionInLine(), token.getText(), identifier, arguments);
                 }
                 else if (token.getKind() == PLPTokenKinds.Kind.LSQUARE)
                 {
                     match(PLPTokenKinds.Kind.LSQUARE);
-                    expression();
+                    IExpression expression = expression();
                     match(PLPTokenKinds.Kind.RSQUARE);
+                    return expression;
                 }
+
+                return new IdentExpression__(identifierToken.getLine(), identifierToken.getCharPositionInLine(), identifierToken.getText(), identifier);
             }
         }
+        return null;
     }
-
-//
-//    private void factor() throws SyntaxException
-//    {
-//        switch (token.getKind())
-//        {
-//            case INT_LITERAL -> match(PLPTokenKinds.Kind.INT_LITERAL);
-//            case LPAREN -> {
-//                match(PLPTokenKinds.Kind.LPAREN);
-//                expr();
-//                match(PLPTokenKinds.Kind.RPAREN);
-//            }
-//        }
-//    }
-//
-//    private void term() throws SyntaxException
-//    {
-//        factor();
-//        while (token.getKind() == PLPTokenKinds.Kind.TIMES || token.getKind() == PLPTokenKinds.Kind.DIV)
-//        {
-//            switch (token.getKind())
-//            {
-//                case TIMES -> match(PLPTokenKinds.Kind.TIMES);
-//                case DIV -> match(PLPTokenKinds.Kind.DIV);
-//            }
-//            factor();
-//        }
-//    }
-//
-//    private void expr() throws SyntaxException
-//    {
-//        term();
-//        while (token.getKind() == PLPTokenKinds.Kind.PLUS || token.getKind() == PLPTokenKinds.Kind.MINUS)
-//        {
-//            switch (token.getKind())
-//            {
-//                case PLUS -> match(PLPTokenKinds.Kind.PLUS);
-//                case MINUS -> match(PLPTokenKinds.Kind.MINUS);
-//            }
-//            term();
-//        }
-//    }
 }

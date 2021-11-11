@@ -79,7 +79,9 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitIBooleanLiteralExpression(IBooleanLiteralExpression n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		IType type = PrimitiveType__.booleanType;
+		n.setType(type);
+		return type;
 	}
 
 	@Override
@@ -137,7 +139,14 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitIIfStatement(IIfStatement n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		//throw new UnsupportedOperationException("IMPLEMENT ME!");
+
+		IExpression expression = n.getGuardExpression();
+		IType expressionType = (IType) expression.visit(this, arg);
+		check(expressionType.isBoolean(), n, "Guard expression type not boolean");
+		IBlock block = n.getBlock();
+		block.visit(this, arg);
+		return arg;
 	}
 
 	@Override
@@ -164,7 +173,17 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitILetStatement(ILetStatement n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		//throw new UnsupportedOperationException("IMPLEMENT ME!");
+
+		IExpression expression = n.getExpression();
+		IType expressionType = (IType) expression.visit(this, arg);
+		INameDef nameDef = n.getLocalDef();
+		IType declaredType = (IType) nameDef.visit(this, n);
+		IType inferredType = unifyAndCheck(declaredType, expressionType, n);
+		nameDef.setType(inferredType);
+		IBlock block = n.getBlock();
+		block.visit(this, arg);
+		return arg;
 	}
 
 	@Override
@@ -248,7 +267,13 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitIReturnStatement(IReturnStatement n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		//throw new UnsupportedOperationException("IMPLEMENT ME!");
+
+		IExpression expression = n.getExpression();
+		IType expressionType = (IType) expression.visit(this, arg);
+		IFunctionDeclaration declaration = (IFunctionDeclaration) arg;
+		check(compatibleAssignmentTypes(expressionType, declaration.getResultType()), n, "");
+		return arg;
 	}
 
 	@Override
@@ -286,7 +311,25 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitISwitchStatement(ISwitchStatement n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		//throw new UnsupportedOperationException("IMPLEMENT ME!");
+
+		IExpression expression = n.getSwitchExpression();
+		IType expressionType = (IType) expression.visit(this, arg);
+		check(expressionType.isInt() || expressionType.isBoolean() || expressionType.isString(), n, "");
+		List<IExpression> expressions = n.getBranchExpressions();
+		List<IBlock> blocks = n.getBlocks();
+		for (int i = 0; i < expressions.size(); i++)
+		{
+			IExpression branchExp = expressions.get(i);
+			IType branchExpType = (IType) branchExp.visit(this, arg);
+			check(compatibleAssignmentTypes(branchExpType, expressionType), n, "");
+			check(isConstantExpression(branchExp), n, "");
+			IBlock block = blocks.get(i);
+			block.visit(this, arg);
+		}
+		IBlock defaultBlock = n.getDefaultBlock();
+		defaultBlock.visit(this, arg);
+		return arg;
 	}
 
 	@Override

@@ -30,7 +30,7 @@ public class Token implements IPLPToken
     @Override
     public int getLine()
     {
-        return lineIndex + 1;
+        return lineIndex;
     }
 
     @Override

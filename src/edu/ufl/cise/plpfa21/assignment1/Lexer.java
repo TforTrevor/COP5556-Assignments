@@ -1,193 +1,364 @@
 package edu.ufl.cise.plpfa21.assignment1;
 
 import java.util.ArrayList;
-import java.util.Arrays;
+import edu.ufl.cise.plpfa21.assignment1.PLPTokenKinds.Kind;
 
 public class Lexer implements IPLPLexer
 {
-    private ArrayList<String> tokenStrings = new ArrayList<>();
-    private ArrayList<Integer> lineIndices = new ArrayList<>();
-    private ArrayList<Integer> charIndices = new ArrayList<>();
-    private int index;
+    private ArrayList<IPLPToken> tokenList;
+    private int tokenPos;
+    private enum State { START, HAVE_EQUAL, HAVE_NEQUAL, DIGITS, IDENT_PART, COMMENT, STRING, BOOL_OP }
 
-    public Lexer(String code)
+    public Lexer (String input)
     {
-        ArrayList<String> lines = new ArrayList<>(Arrays.asList(code.split("\n")));
-        for (String line : lines)
+        this.tokenPos = 0;
+        this.tokenList = new ArrayList<>();
+        try {
+            this.tokenList = readInput(input);
+        } catch (LexicalException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public ArrayList<IPLPToken> readInput (String input) throws LexicalException
+    {
+        ArrayList<IPLPToken> tokenList = new ArrayList<>();
+        StringBuilder stringBuilder = new StringBuilder();
+
+        Kind kind;
+        State state = State.START;
+
+        char[] inputChars = input.toCharArray();
+        char previousChar = 0;
+        char nextChar = 0;
+
+        int currentLine = 1;
+        int currentPos = 0;
+        int firstLineOfString = 0;
+        int index = 0;
+
+        while (index < inputChars.length)
         {
-            StringBuilder token = new StringBuilder();
-            IntHolder tokenIndex = new IntHolder(-1);
-            boolean comment = false;
+            char c = inputChars[index];
 
-            for (int i = 0; i < line.length(); i++)
+            if (index > 0)
             {
-                char c = line.charAt(i);
+                previousChar = input.charAt(index - 1);
+            }
+            if (index < inputChars.length - 1)
+            {
+                nextChar = input.charAt(index + 1);
+            }
 
-                if (comment)
-                {
-                    if (c == '*')
-                    {
-                        token.append(c);
-                    }
-                    else if (c == '/' && token.charAt(token.length() - 1) == '*')
-                    {
-                        token.setLength(0);
-                        comment = false;
-                    }
-                }
-                else
-                {
+            switch (state)
+            {
+                case START -> {
                     switch (c)
                     {
-                        case ' ', '\n', '\r', '\t' -> delimit(token, lines.indexOf(line), tokenIndex);
-                        case ',', ';', ':', '(', ')', '[', ']', '<', '>', '+', '-' -> {
-                            delimit(token, lines.indexOf(line), tokenIndex);
-                            if (tokenIndex.value == -1)
-                                tokenIndex.value = i;
-                            token.append(c);
-                            delimit(token, lines.indexOf(line), tokenIndex);
+                        case ' ', '\t' -> {
+                            index++;
+                            currentPos++;
+                        }
+                        case '\n', '\r' -> {
+                            index++;
+                            currentPos = 0;
+                            currentLine++;
+                        }
+                        case '0' -> {
+                            tokenList.add(new Token(Kind.INT_LITERAL, "0", currentLine, currentPos));
+                            index++;
+                            currentPos++;
+                        }
+                        case '+', ',', ';', ':', '(', ')', '[', ']', '<', '>', '-' -> {
+                            String text = String.valueOf(c);
+                            kind = findKind(text, currentLine, currentPos);
+                            tokenList.add(new Token(kind, text, currentLine, currentPos));
+                            index++;
+                            currentPos++;
                         }
                         case '*' -> {
-                            if (token.charAt(token.length() - 1) == '/')
+                            tokenList.add(new Token(Kind.TIMES, "*", currentLine, currentPos));
+                            index++;
+                            currentPos++;
+                        }
+                        case '=' -> {
+                            if (nextChar != '=')
                             {
-                                comment = true;
-                                token.deleteCharAt(token.length() - 1);
-                                delimit(token, lines.indexOf(line), tokenIndex);
+                                tokenList.add(new Token(Kind.ASSIGN, "=", currentLine, currentPos));
                             }
+                            else
+                            {
+                                state = State.HAVE_EQUAL;
+                            }
+                            index++;
+                            currentPos++;
+                        }
+                        case '!' -> {
+                            if (nextChar != '=')
+                            {
+                                tokenList.add(new Token(Kind.BANG, "!", currentLine, currentPos));
+                            }
+                            else
+                            {
+                                state = State.HAVE_NEQUAL;
+                            }
+                            index++;
+                            currentPos++;
+                        }
+                        case '/' -> {
+                            if (nextChar == '*')
+                            {
+                                state = State.COMMENT;
+                            }
+                            else
+                            {
+                                tokenList.add(new Token(Kind.DIV, "/", currentLine, currentPos));
+                            }
+                            index++;
+                            currentPos++;
+                        }
+                        case '&', '|' -> {
+                            stringBuilder.append(c);
+                            state = State.BOOL_OP;
+                            index++;
+                            currentPos++;
+                        }
+                        case '1', '2', '3', '4', '5', '6', '7', '8', '9' -> {
+                            stringBuilder.append(c);
+                            state = State.DIGITS;
+                            index++;
+                            currentPos++;
+                        }
+                        case '\"', '\'' -> {
+                            firstLineOfString = currentLine;
+                            stringBuilder.append(c);
+                            state = State.STRING;
+                            index++;
+                            currentPos++;
                         }
                         default -> {
-                            if (token.length() > 0 && Character.isDigit(token.charAt(0)) && !Character.isDigit(c))
+                            if (Character.isJavaIdentifierStart(c))
                             {
-                                delimit(token, lines.indexOf(line), tokenIndex);
+                                index++;
+                                stringBuilder.append(c);
+                                state = State.IDENT_PART;
+                                currentPos++;
                             }
-
-                            if (tokenIndex.value == -1)
-                                tokenIndex.value = i;
-                            token.append(c);
+                            else
+                            {
+                                if (c != 0)
+                                {
+                                    tokenList.add(new Token(Kind.ERROR, "", currentLine, currentPos));
+                                    index++;
+                                    currentPos++;
+                                }
+                            }
                         }
                     }
-
-                    if (token.toString().equals("=="))
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                    if (token.toString().equals("!="))
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                    if (token.toString().equals("!="))
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                    if (token.toString().equals("&&"))
-                        delimit(token, lines.indexOf(line), tokenIndex);
-                    if (token.toString().equals("||"))
-                        delimit(token, lines.indexOf(line), tokenIndex);
-
-                    if (i == line.length() - 1)
-                        delimit(token, lines.indexOf(line), tokenIndex);
                 }
-            }
-        }
-    }
+                case STRING -> {
+                    if (c != stringBuilder.charAt(0))
+                    {
+                        index++;
+                        if (c == '\n' || c == '\r')
+                        {
+                            currentLine++;
+                            currentPos = 0;
+                        }
+                        stringBuilder.append(c);
+                        currentPos++;
+                    }
+                    else
+                    {
+                        stringBuilder.append(c);
+                        index++;
+                        currentPos++;
+                        state = State.START;
+                        String text = stringBuilder.toString();
 
-    private void delimit(StringBuilder token, int lineIndex, IntHolder tokenIndex)
-    {
-        if (token.length() > 0)
-        {
-            tokenStrings.add(token.toString());
-            lineIndices.add(lineIndex);
-            charIndices.add(tokenIndex.value);
-        }
-        token.setLength(0);
-        tokenIndex.value = -1;
-    }
-
-    @Override
-    public IPLPToken nextToken() throws LexicalException
-    {
-        Token token = null;
-        if (index < tokenStrings.size())
-        {
-            String string = tokenStrings.get(index);
-            int lineIndex = lineIndices.get(index);
-            int charIndex = charIndices.get(index);
-
-            if (Character.isLetter(string.charAt(0)))
-            {
-                switch (string)
-                {
-                    case "VAR" -> token = new Token(PLPTokenKinds.Kind.KW_VAR, string, lineIndex, charIndex);
-                    case "VAL" -> token = new Token(PLPTokenKinds.Kind.KW_VAL, string, lineIndex, charIndex);
-                    case "FUN" -> token = new Token(PLPTokenKinds.Kind.KW_FUN, string, lineIndex, charIndex);
-                    case "DO" -> token = new Token(PLPTokenKinds.Kind.KW_DO, string, lineIndex, charIndex);
-                    case "END" -> token = new Token(PLPTokenKinds.Kind.KW_END, string, lineIndex, charIndex);
-                    case "LET" -> token = new Token(PLPTokenKinds.Kind.KW_LET, string, lineIndex, charIndex);
-                    case "SWITCH" -> token = new Token(PLPTokenKinds.Kind.KW_SWITCH, string, lineIndex, charIndex);
-                    case "CASE" -> token = new Token(PLPTokenKinds.Kind.KW_CASE, string, lineIndex, charIndex);
-                    case "DEFAULT" -> token = new Token(PLPTokenKinds.Kind.KW_DEFAULT, string, lineIndex, charIndex);
-                    case "IF" -> token = new Token(PLPTokenKinds.Kind.KW_IF, string, lineIndex, charIndex);
-                    case "WHILE" -> token = new Token(PLPTokenKinds.Kind.KW_WHILE, string, lineIndex, charIndex);
-                    case "RETURN" -> token = new Token(PLPTokenKinds.Kind.KW_RETURN, string, lineIndex, charIndex);
-                    case "NIL" -> token = new Token(PLPTokenKinds.Kind.KW_NIL, string, lineIndex, charIndex);
-                    case "TRUE" -> token = new Token(PLPTokenKinds.Kind.KW_TRUE, string, lineIndex, charIndex);
-                    case "FALSE" -> token = new Token(PLPTokenKinds.Kind.KW_FALSE, string, lineIndex, charIndex);
-                    case "INT" -> token = new Token(PLPTokenKinds.Kind.KW_INT, string, lineIndex, charIndex);
-                    case "STRING" -> token = new Token(PLPTokenKinds.Kind.KW_STRING, string, lineIndex, charIndex);
-                    case "BOOLEAN" -> token = new Token(PLPTokenKinds.Kind.KW_BOOLEAN, string, lineIndex, charIndex);
-                    case "LIST" -> token = new Token(PLPTokenKinds.Kind.KW_LIST, string, lineIndex, charIndex);
-                    default -> token = new Token(PLPTokenKinds.Kind.IDENTIFIER, string, lineIndex, charIndex);
+                        kind = findKind(text, currentLine, currentPos);
+                        tokenList.add(new Token(kind, text, firstLineOfString, currentPos-text.length()));
+                        stringBuilder.setLength(0);
+                    }
                 }
-            } else if (Character.isDigit(string.charAt(0)))
-            {
-                try
-                {
-                    int test = Integer.parseInt(string);
-                    token = new Token(PLPTokenKinds.Kind.INT_LITERAL, string, lineIndex, charIndex);
-                } catch (NumberFormatException e)
-                {
-                    throw new LexicalException("Integer cannot be parsed", lineIndex, charIndex);
+                case BOOL_OP -> {
+                    if (c == previousChar)
+                    {
+                        stringBuilder.append(c);
+                        String text = stringBuilder.toString();
+                        kind = findKind(text, currentLine, currentPos);
+                        tokenList.add(new Token(kind, text, currentLine, currentPos - 1));
+                        stringBuilder.setLength(0);
+                        state = State.START;
+                        currentPos++;
+                    }
+                    else
+                    {
+                        tokenList.add(new Token(Kind.ERROR, "", currentLine, currentPos));
+                    }
+                    index++;
                 }
-            } else if (string.charAt(0) == '"' || string.charAt(0) == 39)
-            {
-                token = new Token(PLPTokenKinds.Kind.STRING_LITERAL, string, lineIndex, charIndex);
-            } else
-            {
-                switch (string)
-                {
-                    case "=" -> token = new Token(PLPTokenKinds.Kind.ASSIGN, string, lineIndex, charIndex);
-                    case "," -> token = new Token(PLPTokenKinds.Kind.COMMA, string, lineIndex, charIndex);
-                    case ";" -> token = new Token(PLPTokenKinds.Kind.SEMI, string, lineIndex, charIndex);
-                    case ":" -> token = new Token(PLPTokenKinds.Kind.COLON, string, lineIndex, charIndex);
-                    case "(" -> token = new Token(PLPTokenKinds.Kind.LPAREN, string, lineIndex, charIndex);
-                    case ")" -> token = new Token(PLPTokenKinds.Kind.RPAREN, string, lineIndex, charIndex);
-                    case "[" -> token = new Token(PLPTokenKinds.Kind.LSQUARE, string, lineIndex, charIndex);
-                    case "]" -> token = new Token(PLPTokenKinds.Kind.RSQUARE, string, lineIndex, charIndex);
-                    case "&&" -> token = new Token(PLPTokenKinds.Kind.AND, string, lineIndex, charIndex);
-                    case "||" -> token = new Token(PLPTokenKinds.Kind.OR, string, lineIndex, charIndex);
-                    case "<" -> token = new Token(PLPTokenKinds.Kind.LT, string, lineIndex, charIndex);
-                    case ">" -> token = new Token(PLPTokenKinds.Kind.GT, string, lineIndex, charIndex);
-                    case "==" -> token = new Token(PLPTokenKinds.Kind.EQUALS, string, lineIndex, charIndex);
-                    case "!=" -> token = new Token(PLPTokenKinds.Kind.NOT_EQUALS, string, lineIndex, charIndex);
-                    case "!" -> token = new Token(PLPTokenKinds.Kind.BANG, string, lineIndex, charIndex);
-                    case "+" -> token = new Token(PLPTokenKinds.Kind.PLUS, string, lineIndex, charIndex);
-                    case "-" -> token = new Token(PLPTokenKinds.Kind.MINUS, string, lineIndex, charIndex);
-                    case "*" -> token = new Token(PLPTokenKinds.Kind.TIMES, string, lineIndex, charIndex);
-                    case "/" -> token = new Token(PLPTokenKinds.Kind.DIV, string, lineIndex, charIndex);
-                    default -> {
-                        throw new LexicalException("Unknown token: " + string, lineIndex, charIndex);
+                case COMMENT -> {
+                    if (c == '/' && previousChar == '*')
+                    {
+                        state = State.START;
+                    }
+                    index++;
+                    currentPos++;
+                }
+                case HAVE_EQUAL -> {
+                    if (c == '=')
+                    {
+                        tokenList.add(new Token(Kind.EQUALS, "==", currentLine, currentPos - 1));
+                        currentPos++;
+                    }
+                    else
+                    {
+                        tokenList.add(new Token(Kind.ERROR, "", currentLine, currentPos));
+                    }
+                    index++;
+                    state = State.START;
+                }
+                case HAVE_NEQUAL -> {
+                    if(c == '=')
+                    {
+                        tokenList.add(new Token(Kind.NOT_EQUALS, "!=", currentLine, currentPos - 1));
+                        currentPos++;
+                    }
+                    else
+                    {
+                        tokenList.add(new Token(Kind.ERROR, "", currentLine, currentPos));
+                    }
+                    index++;
+                    state = State.START;
+                }
+                case DIGITS -> {
+                    if (Character.isDigit(c))
+                    {
+                        index++;
+                        currentPos++;
+                        stringBuilder.append(c);
+                    }
+                    else
+                    {
+                        String text = stringBuilder.toString();
+                        tokenList.add(new Token(Kind.INT_LITERAL, text, currentLine, currentPos-text.length()));
+                        stringBuilder.setLength(0);
+                        state = State.START;
+                    }
+                }
+                case IDENT_PART -> {
+                    if (Character.isDigit(c) || Character.isLetter(c) || c == '_' || c == '$')
+                    {
+                        index++;
+                        currentPos++;
+                        stringBuilder.append(c);
+                    }
+                    else
+                    {
+                        String text = stringBuilder.toString();
+                        kind = findKind(text, currentLine, currentPos);
+                        tokenList.add(new Token(kind, text, currentLine, currentPos-text.length()));
+                        stringBuilder.setLength(0);
+                        state = State.START;
                     }
                 }
             }
-            index++;
-        } else
-        {
-            token = new Token(PLPTokenKinds.Kind.EOF, "\n", 0, 0);
         }
-        return token;
+        return tokenList;
+    }
+    private Kind findKind (String kindString, int line, int pos)
+    {
+        char c = kindString.charAt(0);
+        Kind kind = Kind.ERROR;
+        if (Character.isLetter(c) || c == '$' || c == '_')
+        {
+            switch(kindString)
+            {
+                case "FUN" -> kind = Kind.KW_FUN;
+                case "DO" ->  kind = Kind.KW_DO;
+                case "END" -> kind = Kind.KW_END;
+                case "LET" -> kind = Kind.KW_LET;
+                case "SWITCH" -> kind = Kind.KW_SWITCH;
+                case "CASE" -> kind = Kind.KW_CASE;
+                case "DEFAULT" -> kind = Kind.KW_DEFAULT;
+                case "IF" -> kind = Kind.KW_IF;
+                case "ELSE" -> kind = Kind.KW_ELSE;
+                case "WHILE" -> kind = Kind.KW_WHILE;
+                case "RETURN" -> kind = Kind.KW_RETURN;
+                case "LIST" -> kind = Kind.KW_LIST;
+                case "VAR" -> kind = Kind.KW_VAR;
+                case "VAL" -> kind = Kind.KW_VAL;
+                case "NIL" -> kind = Kind.KW_NIL;
+                case "TRUE" -> kind = Kind.KW_TRUE;
+                case "FALSE" -> kind = Kind.KW_FALSE;
+                case "INT" -> kind = Kind.KW_INT;
+                case "STRING" -> kind = Kind.KW_STRING;
+                case "FLOAT" -> kind = Kind.KW_FLOAT;
+                case "BOOLEAN" -> kind = Kind.KW_BOOLEAN;
+                default -> kind = Kind.IDENTIFIER;
+            }
+        }
+        else if (Character.isDigit(c))
+        {
+            kind = Kind.INT_LITERAL;
+        }
+        else if (c == '\'' || c == '\"')
+        {
+            kind = Kind.STRING_LITERAL;
+        }
+        else
+        {
+            switch (kindString)
+            {
+                case"(" -> kind = Kind.LPAREN;
+                case":" -> kind = Kind.COLON;
+                case"," -> kind = Kind.COMMA;
+                case ")" -> kind = Kind.RPAREN;
+                case "=" -> kind = Kind.ASSIGN;
+                case ";" -> kind = Kind.SEMI;
+                case "&&" -> kind = Kind.AND;
+                case "||" -> kind = Kind.OR;
+                case "<" -> kind = Kind.LT;
+                case ">" -> kind = Kind.GT;
+                case "==" -> kind = Kind.EQUALS;
+                case "!=" -> kind = Kind.NOT_EQUALS;
+                case "+" -> kind = Kind.PLUS;
+                case "-" -> kind = Kind.MINUS;
+                case "*" -> kind = Kind.TIMES;
+                case "/" -> kind = Kind.DIV;
+                case "!" -> kind = Kind.BANG;
+                case "[" -> kind = Kind.LSQUARE;
+                case "]" -> kind = Kind.RSQUARE;
+            }
+        }
+        return kind;
     }
 
-    private class IntHolder
+    public IPLPToken nextToken() throws LexicalException
     {
-        public int value;
+        IPLPToken token = new Token(Kind.EOF, "", 0, 0);
 
-        public IntHolder(int value)
+        if (tokenPos < tokenList.size())
         {
-            this.value = value;
+            token = tokenList.get(tokenPos);
+            this.tokenPos++;
         }
+
+        if (token.getKind() == Kind.ERROR)
+        {
+            throw new LexicalException("Illegal character detected", token.getLine(), token.getCharPositionInLine());
+        }
+        else if (token.getKind() == Kind.INT_LITERAL)
+        {
+            try {
+                Integer.parseInt(token.getText());
+                tokenList.set(tokenPos - 1, new Token(token.getKind(), token.getText(), token.getLine(), token.getCharPositionInLine()));
+                token = tokenList.get(tokenPos - 1);
+            } catch (NumberFormatException e) {
+                throw new LexicalException("Integer out of range", token.getLine(), token.getCharPositionInLine());
+            }
+        }
+        return token;
     }
 }

@@ -46,7 +46,7 @@ public class Parser implements IPLPParser
         }
         else
         {
-            throw new SyntaxException("Test", token.getLine(), token.getCharPositionInLine());
+            throw new SyntaxException("Token kind: " + token.getKind().name() + " Match kind: " + kind.name(), token.getLine(), token.getCharPositionInLine());
         }
     }
 
@@ -183,7 +183,7 @@ public class Parser implements IPLPParser
     {
         IPLPToken blockToken = this.token;
         ArrayList<IStatement> statements = new ArrayList<>();
-        while (token.getKind() != PLPTokenKinds.Kind.KW_END && token.getKind() != PLPTokenKinds.Kind.KW_DEFAULT)
+        while (token.getKind() != PLPTokenKinds.Kind.KW_END && token.getKind() != PLPTokenKinds.Kind.KW_DEFAULT && token.getKind() != PLPTokenKinds.Kind.KW_CASE)
         {
             statements.add(statement());
         }
@@ -198,13 +198,17 @@ public class Parser implements IPLPParser
                 IPLPToken token = match(PLPTokenKinds.Kind.KW_LET);
                 INameDef localDef = nameDef();
                 IExpression expression = null;
-                if (token.getKind() == PLPTokenKinds.Kind.ASSIGN)
+                if (this.token.getKind() == PLPTokenKinds.Kind.ASSIGN)
                 {
+                    match(PLPTokenKinds.Kind.ASSIGN);
                     expression = expression();
                 }
-                match(PLPTokenKinds.Kind.SEMI);
+                match(PLPTokenKinds.Kind.KW_DO);
+                IBlock block = block();
+                match(PLPTokenKinds.Kind.KW_END);
+                //match(PLPTokenKinds.Kind.SEMI);
 
-                return new LetStatement__(token.getLine(), token.getCharPositionInLine(), token.getText(), null, expression, localDef);
+                return new LetStatement__(token.getLine(), token.getCharPositionInLine(), token.getText(), block, expression, localDef);
             }
             case KW_SWITCH -> {
                 IPLPToken switchToken = match(PLPTokenKinds.Kind.KW_SWITCH);
@@ -216,7 +220,7 @@ public class Parser implements IPLPParser
                 {
                     match(PLPTokenKinds.Kind.KW_CASE);
                     branchExpressions.add(expression());
-                    match(PLPTokenKinds.Kind.SEMI);
+                    match(PLPTokenKinds.Kind.COLON);
                     blocks.add(block());
                 }
                 match(PLPTokenKinds.Kind.KW_DEFAULT);
@@ -255,8 +259,9 @@ public class Parser implements IPLPParser
                 IPLPToken token = this.token;
                 IExpression left = expression();
                 IExpression right = null;
-                if (token.getKind() == PLPTokenKinds.Kind.ASSIGN)
+                if (this.token.getKind() == PLPTokenKinds.Kind.ASSIGN)
                 {
+                    match(PLPTokenKinds.Kind.ASSIGN);
                     right = expression();
                 }
                 match(PLPTokenKinds.Kind.SEMI);

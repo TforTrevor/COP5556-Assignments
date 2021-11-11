@@ -61,7 +61,30 @@ public class TypeCheckVisitor implements ASTVisitor {
 	@Override
 	public Object visitIBinaryExpression(IBinaryExpression n, Object arg) throws Exception {
 		//TODO
-		throw new UnsupportedOperationException("IMPLEMENT ME!");
+		//throw new UnsupportedOperationException("IMPLEMENT ME!");
+		IExpression leftExp = n.getLeft();
+		IExpression rightExp = n.getRight();
+		IType leftType = (IType) leftExp.visit(this, arg);
+		IType rightType = (IType) rightExp.visit(this, arg);
+		check(compatibleAssignmentTypes(leftType, rightType), n, "");
+		Kind op = n.getOp();
+		switch (op) {
+			case EQUALS, NOT_EQUALS, LT, GT -> {
+				n.setType(PrimitiveType__.booleanType);
+			}
+			case PLUS -> {
+				n.setType(leftType);
+			}
+			case MINUS, TIMES, DIV -> {
+				if (leftType.isInt())
+				n.setType(PrimitiveType__.intType);
+			}
+			case AND, OR -> {
+				if (leftType.isBoolean())
+					n.setType(PrimitiveType__.booleanType);
+			}
+		}
+		return n.getType();
 	}
 
 	/**
@@ -176,11 +199,13 @@ public class TypeCheckVisitor implements ASTVisitor {
 		//throw new UnsupportedOperationException("IMPLEMENT ME!");
 
 		IExpression expression = n.getExpression();
-		IType expressionType = (IType) expression.visit(this, arg);
+		IType expressionType = expression != null ? (IType) expression.visit(this, arg) : Type__.undefinedType;
 		INameDef nameDef = n.getLocalDef();
 		IType declaredType = (IType) nameDef.visit(this, n);
-		IType inferredType = unifyAndCheck(declaredType, expressionType, n);
-		nameDef.setType(inferredType);
+		if (expression != null) {
+			IType inferredType = unifyAndCheck(declaredType, expressionType, n);
+			nameDef.setType(inferredType);
+		}
 		IBlock block = n.getBlock();
 		block.visit(this, arg);
 		return arg;

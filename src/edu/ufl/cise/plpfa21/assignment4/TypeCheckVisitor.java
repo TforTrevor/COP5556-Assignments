@@ -3,37 +3,8 @@ package edu.ufl.cise.plpfa21.assignment4;
 import java.util.List;
 
 import edu.ufl.cise.plpfa21.assignment1.PLPTokenKinds.Kind;
-import edu.ufl.cise.plpfa21.assignment3.ast.ASTVisitor;
-import edu.ufl.cise.plpfa21.assignment3.ast.IASTNode;
-import edu.ufl.cise.plpfa21.assignment3.ast.IAssignmentStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IBinaryExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IBlock;
-import edu.ufl.cise.plpfa21.assignment3.ast.IBooleanLiteralExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IDeclaration;
-import edu.ufl.cise.plpfa21.assignment3.ast.IExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IFunctionCallExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IFunctionDeclaration;
-import edu.ufl.cise.plpfa21.assignment3.ast.IIdentExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IIdentifier;
-import edu.ufl.cise.plpfa21.assignment3.ast.IIfStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IImmutableGlobal;
-import edu.ufl.cise.plpfa21.assignment3.ast.IIntLiteralExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.ILetStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IListSelectorExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IListType;
-import edu.ufl.cise.plpfa21.assignment3.ast.IMutableGlobal;
-import edu.ufl.cise.plpfa21.assignment3.ast.INameDef;
-import edu.ufl.cise.plpfa21.assignment3.ast.INilConstantExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IPrimitiveType;
-import edu.ufl.cise.plpfa21.assignment3.ast.IProgram;
-import edu.ufl.cise.plpfa21.assignment3.ast.IReturnStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IStringLiteralExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.ISwitchStatement;
-import edu.ufl.cise.plpfa21.assignment3.ast.IType;
+import edu.ufl.cise.plpfa21.assignment3.ast.*;
 import edu.ufl.cise.plpfa21.assignment3.ast.IType.TypeKind;
-import edu.ufl.cise.plpfa21.assignment3.ast.IUnaryExpression;
-import edu.ufl.cise.plpfa21.assignment3.ast.IWhileStatement;
 import edu.ufl.cise.plpfa21.assignment3.astimpl.ListType__;
 import edu.ufl.cise.plpfa21.assignment3.astimpl.PrimitiveType__;
 import edu.ufl.cise.plpfa21.assignment3.astimpl.Type__;
@@ -105,6 +76,12 @@ public class TypeCheckVisitor implements ASTVisitor {
 		IType type = PrimitiveType__.booleanType;
 		n.setType(type);
 		return type;
+	}
+
+	@Override
+	public Object visitIExpressionStatement(IExpressionStatement n, Object arg) throws Exception
+	{
+		return null;
 	}
 
 	@Override

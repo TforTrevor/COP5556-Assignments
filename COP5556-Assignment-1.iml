@@ -33,5 +33,6 @@
         <SOURCES />
       </library>
     </orderEntry>
+    <orderEntry type="library" name="ow2.asm.util" level="project" />
   </component>
 </module>

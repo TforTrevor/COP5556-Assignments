@@ -42,9 +42,9 @@ import edu.ufl.cise.plpfa21.assignment3.ast.IType;
 import edu.ufl.cise.plpfa21.assignment3.ast.IUnaryExpression;
 import edu.ufl.cise.plpfa21.assignment3.ast.IWhileStatement;
 import edu.ufl.cise.plpfa21.assignment3.astimpl.Type__;
-import edu.ufl.cise.plpfa21.assignment5.ReferenceCodeGenVisitor.LocalVarInfo;
-import edu.ufl.cise.plpfa21.assignment5.ReferenceCodeGenVisitor.MethodVisitorLocalVarTable;
-import edu.ufl.cise.plpfa21.pLP.ListSelectorExpression;
+//import edu.ufl.cise.plpfa21.assignment5.ReferenceCodeGenVisitor.LocalVarInfo;
+//import edu.ufl.cise.plpfa21.assignment5.ReferenceCodeGenVisitor.MethodVisitorLocalVarTable;
+//import edu.ufl.cise.plpfa21.pLP.ListSelectorExpression;
 
 
 public class StarterCodeGenVisitor implements ASTVisitor, Opcodes {
@@ -175,14 +175,22 @@ public class StarterCodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitIFunctionCallExpression(IFunctionCallExpression n, Object arg) throws Exception {
-		throw new UnsupportedOperationException("TO IMPLEMENT");
+		MethodVisitor mv = ((MethodVisitorLocalVarTable)arg).mv;
+		IIdentifier identifier = n.getName();
+		List<IExpression> expressions = n.getArgs();
+		for (IExpression expression : expressions)
+		{
+			expression.visit(this, arg);
+			mv.visitMethodInsn(INVOKESTATIC, runtimeClass, identifier.getName(), expression.getType().getDesc(),false);
+		}
+		return null;
 	}
 
 	@Override
 	public Object visitIIdentExpression(IIdentExpression n, Object arg) throws Exception {
 		MethodVisitor mv = ((MethodVisitorLocalVarTable)arg).mv;
-		mv.visit(n.getName());
-		throw new UnsupportedOperationException("TO IMPLEMENT");
+		mv.visitLdcInsn(n.getName());
+		return null;
 	}
 
 	@Override
@@ -192,6 +200,11 @@ public class StarterCodeGenVisitor implements ASTVisitor, Opcodes {
 
 	@Override
 	public Object visitIIfStatement(IIfStatement n, Object arg) throws Exception {
+		MethodVisitor mv = ((MethodVisitorLocalVarTable)arg).mv;
+		IExpression expression = n.getGuardExpression();
+		IBlock block = n.getBlock();
+		expression.visit(this, arg);
+		expression.getType();
 		throw new UnsupportedOperationException("TO IMPLEMENT");
 	}
 

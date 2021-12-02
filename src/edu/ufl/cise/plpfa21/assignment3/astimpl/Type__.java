@@ -61,8 +61,8 @@ public class Type__ extends ASTNode__ implements IType {
 		if (this.equals(voidType)) return "V";
 		else if (isInt()) return "I";
 		else if (isBoolean()) return "B";
-		else if (isString()) return "Ljava/lang/String";
-		else if (isList()) return "L";
+		else if (isString()) return "Ljava/lang/String;";
+		else if (isList()) return "Ljava/util/ArrayList;";
 		throw new Exception("Type not defined");
 	}
 

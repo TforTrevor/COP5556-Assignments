@@ -599,7 +599,7 @@ public class CodeGenTests {
 		String input = """
 				VAR x = 3;
 				VAR y = 4;
-				VAR z = x*y;
+				VAR z = x*y;			
 				""";
 		byte[] bytecode = compile(input, className, packageName);
 		show(CodeGenUtils.bytecodeToString(bytecode));

@@ -60,7 +60,7 @@ public class Type__ extends ASTNode__ implements IType {
 	public String getDesc() throws Exception {
 		if (this.equals(voidType)) return "V";
 		else if (isInt()) return "I";
-		else if (isBoolean()) return "B";
+		else if (isBoolean()) return "Z";
 		else if (isString()) return "Ljava/lang/String;";
 		else if (isList()) return "Ljava/util/ArrayList;";
 		throw new Exception("Type not defined");

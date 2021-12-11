@@ -5,5 +5,6 @@ public interface INameDef extends IDeclaration {
 	IIdentifier getIdent();
 	IType getType();
 	void setType(IType type);
-
+	boolean isLocal();
+	void setLocal(boolean value);
 }

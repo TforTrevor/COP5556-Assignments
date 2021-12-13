@@ -9,8 +9,6 @@ public class NameDef__ extends ASTNode__ implements INameDef {
 	
 	final IIdentifier identifier;
 	IType type;
-	boolean isLocal;
-	
 
 	public NameDef__(int line, int posInLine, String text, IIdentifier identifier, IType type) {
 		super(line, posInLine, text);
@@ -43,16 +41,5 @@ public class NameDef__ extends ASTNode__ implements INameDef {
 		return "NameDef__ [identifier=" + identifier + ", type=" + type + "]";
 	}
 
-	@Override
-	public boolean isLocal()
-	{
-		return isLocal;
-	}
-
-	@Override
-	public void setLocal(boolean value)
-	{
-		isLocal = value;
-	}
 
 }

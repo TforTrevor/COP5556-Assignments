@@ -246,12 +246,23 @@ public class StarterCodeGenVisitor implements ASTVisitor, Opcodes {
 		MethodVisitor mv = ((MethodVisitorLocalVarTable)arg).mv;
 		IIdentifier identifier = n.getName();
 		List<IExpression> expressions = n.getArgs();
-		for (IExpression expression : expressions)
+		String methodDesc = "";
+
+		if (expressions.size() > 0)
 		{
-			expression.visit(this, arg);
-			String methodDesc = "(" + expression.getType().getDesc() + ")" + n.getType().getDesc();
-			mv.visitMethodInsn(INVOKESTATIC, className, identifier.getName(), methodDesc,false);
+			methodDesc += "(";
+			for (IExpression expression : expressions)
+			{
+				expression.visit(this, arg);
+				methodDesc += expression.getType().getDesc();
+			}
+			methodDesc += ")" + n.getType().getDesc();
 		}
+		else
+		{
+			methodDesc = "()" + n.getType().getDesc();
+		}
+		mv.visitMethodInsn(INVOKESTATIC, className, identifier.getName(), methodDesc,false);
 
 		return null;
 	}
